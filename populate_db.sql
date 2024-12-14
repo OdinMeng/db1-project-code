@@ -2,6 +2,7 @@
 USE [iLovePets]
 GO
 
+BEGIN TRANSACTION populate_db
 --========================X========================--
 
 -- Populate tables without any FK constraints:
@@ -120,15 +121,79 @@ BEGIN TRANSACTION
 	SELECT * FROM dbo.[SESSION] -- Tests pranas' code as well, it works :thumbsup: 👍
 COMMIT TRANSACTION
 
-	-- Sessions: automatically done with pranas' trigger
+	-- Sessions: automatically done with pranas' trigger. All I have to modify is some rows to have SESSION MAX ATTENDANCE
+BEGIN TRANSACTION
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE=2
+	WHERE SESSION_ID = 1
 
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE = 4
+	WHERE SESSION_ID = 2;
+
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE = 3
+	WHERE SESSION_ID = 5;
+
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE = 2
+	WHERE SESSION_ID = 10;
+
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE = 1
+	WHERE SESSION_ID = 15;
+
+	UPDATE dbo.SESSION
+		SET SESSION_MAX_ATTENDANCE = 10
+	WHERE SESSION_ID = 19;
+
+	SELECT * FROM dbo.[SESSION]
+
+COMMIT TRANSACTION
 	
 --========================X========================--
-
 	
 -- Last Order:
 	-- Slot target breeds
-
+BEGIN TRANSACTION
+	INSERT INTO dbo.[SLOTTARGETBREEDS](BREED_ID, SESSION_ID)
+	VALUES
+		(1, 10),
+		(1, 16),
+		(1, 18),
+		(2, 1),
+		(2, 5),
+		(2, 17),
+		(2, 19),
+		(3, 8),
+		(4, 6),
+		(4, 8),
+		(4, 14),
+		(4, 17),
+		(4, 19),
+		(5, 1),
+		(5, 6),
+		(5, 16),
+		(6, 15),
+		(6, 17),
+		(6, 19),
+		(7, 19); -- Randomly generated numbers with physical dice
+	SELECT * FROM dbo.[SLOTTARGETBREEDS]
+COMMIT TRANSACTION
 
 	-- Bookings
+BEGIN TRANSACTION
+		INSERT INTO dbo.[BOOKING](SESSION_ID, PET_ID, PET_REVIEW, PET_RATING, SITTER_RATING, SITTER_REVIEW)
+		VALUES -- remember: pet id in {1, ..., 5}
+			(20, 1, NULL, NULL, NULL, NULL),
+			(19, 2, 'Great pet', 4, 1, 'Bad sitter'),
+			(19, 1, 'Bad pet!', 1, 5, 'Great sitter'),
+			(18, 3, NULL, 5, 4, NULL),
+			(17, 4, NULL, NULL, 5, '1=1; SELECT * FROM USERS'),
+			(16, 5, NULL, NULL, 4, 'Hey'),
+			(15, 1, NULL, NULL, 5, ''), -- You can toy around with these rows to change ratings, for testing purposes
+			(1, 2, 'Ok pet', 3, 3, 'OK sitter');
+		SELECT * FROM dbo.[BOOKING]
+COMMIT TRANSACTION
 
+COMMIT TRANSACTION populate_db
