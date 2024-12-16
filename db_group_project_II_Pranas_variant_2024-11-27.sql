@@ -1,3 +1,4 @@
+
 -- Base de Dados I - Second Project Deliverable
 
 -- Use DB
@@ -6,7 +7,7 @@ GO
 
 -- Task 1
 
-CREATE OR ALTER FUNCTION getpetsitterreviewgrading(@petsitterid INT) RETURNS VARCHAR(20)
+CREATE OR ALTER FUNCTION GetPetSitterReviewGrading(@petsitterid INT) RETURNS VARCHAR(20)
 AS
 BEGIN
     DECLARE @reviewcount INT
@@ -73,15 +74,15 @@ CREATE OR ALTER TRIGGER trg_review_after_session_end_check
     INSTEAD OF UPDATE AS
 BEGIN
     UPDATE booking
-    SET session_id    = i.session_id,
-        pet_id        = i.pet_id,
+    SET 
         pet_rating    = i.pet_rating,
         pet_review    = i.pet_review,
         sitter_rating = i.sitter_rating,
         sitter_review = i.sitter_review
+
     FROM booking b
              JOIN inserted i
-                  ON b.session_id = i.session_id
+                  ON b.session_id = i.session_id AND i.PET_ID = b.PET_ID
              JOIN session s
                   ON i.session_id = s.session_id
     WHERE s.session_end < GETDATE();
@@ -129,6 +130,7 @@ BEGIN
     INSERT INTO booking (session_id, pet_id, pet_rating, pet_review, sitter_rating, sitter_review)
     SELECT i.session_id, i.pet_id, i.pet_rating, i.pet_review, i.sitter_rating, i.sitter_review
     FROM inserted i
+			-- Join tables to get necessary information to check
              INNER JOIN pet p ON i.pet_id = p.pet_id
              INNER JOIN session s ON i.session_id = s.session_id
              INNER JOIN slotsrecurrenceconfiguration src ON s.recurrence_id = src.recurrence_id
@@ -137,15 +139,24 @@ BEGIN
                         FROM booking
                         GROUP BY session_id) b
                        ON i.session_id = b.session_id
-    WHERE s.session_start > CURRENT_TIMESTAMP
-      AND (COALESCE(b.current_bookings, 0) + 1) <= COALESCE(s.session_max_attendance, u.max_attendance)
-      AND p.breed_id IN (SELECT breed_id
-                         FROM slottargetbreeds
-                         WHERE session_id = i.session_id
-                         UNION
-                         SELECT breed_id
-                         FROM preferredbreeds
-                         WHERE user_id = u.user_id);
+		
+	-- COALESCE is a statement which gets the first non-null value in its input
+		-- ex: COALESCE(NULL,2,NULL) returns 2
+
+    WHERE -- Test conditions
+		s.session_start > GETDATE() AND -- Condition 5.1. 
+		(COALESCE(b.current_bookings, 0) < COALESCE(s.session_max_attendance, u.max_attendance) OR (u.MAX_ATTENDANCE is NULL AND s.SESSION_MAX_ATTENDANCE is NULL)) AND -- Condition 5.2.
+		p.breed_id IN (
+					SELECT breed_id
+					FROM slottargetbreeds
+					WHERE session_id = i.session_id
+
+					UNION
+
+					SELECT breed_id
+					FROM preferredbreeds
+					WHERE user_id = u.user_id
+					); -- Condition 5.3.
 
     DECLARE @num_rec_ok INT; SET @num_rec_ok = @@ROWCOUNT;
     DECLARE @num_rec INT; SELECT @num_rec = COUNT(*) FROM inserted;
@@ -216,15 +227,19 @@ CREATE OR ALTER TRIGGER trg_generate_sessions
     DECLARE @i INT; SET @i = 0;
     DECLARE @id_slot INT;
 
+	-- Create some a temporary table, representing a sort of array of recurrence IDs to be processed
     DECLARE
         @recurrenceids TABLE
                        (
                            recurrence_id INT
                        );
 
+	--  Fill the temporary array
     INSERT INTO @recurrenceids (recurrence_id)
     SELECT i.recurrence_id
     FROM inserted i
+
+	-- "Iterate" over array and execute SP; it processes the array i times, which is the amount of rows to be processed
     WHILE @i < @nrows
         BEGIN
             SET @id_slot = (SELECT TOP 1 r.recurrence_id FROM @recurrenceids r);
@@ -233,9 +248,3 @@ CREATE OR ALTER TRIGGER trg_generate_sessions
             SET @i = @i + 1;
         END;
 GO
-
-
-
-
-
-
